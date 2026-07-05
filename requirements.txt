@@ -6,6 +6,8 @@ pypdf>=4.0
 httpx>=0.27
 supabase>=2.6
 
-# /kit shared components (install order matters: logger before claude)
--e ../../../kit/py/logger
--e ../../../kit/py/claude
+# /kit shared components, vendored into ./vendor so this app deploys standalone.
+# Canonical source lives at /kit/py in the private monorepo; re-sync on change
+# (see DEPLOY.md). Kept non-editable so the deploy build is reproducible.
+./vendor/kit-logger
+./vendor/kit-claude

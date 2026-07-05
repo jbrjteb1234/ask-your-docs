@@ -1,0 +1,10 @@
+# Standalone repo (ask-your-docs) ignores — mirrors the monorepo's for the
+# published subtree, so secrets/artefacts never reach the public repo.
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.egg-info/

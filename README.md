@@ -1,20 +1,56 @@
-# Ask Your Documents — support assistant (M2)
+# Ask Your Documents
 
-Answers questions strictly from YOUR business documents, with citations —
-or an honest "I don't know" plus a route to a human instead of a made-up
-answer. Ships as a chat widget any website can embed with one script tag,
-backed by an admin view that turns unanswered questions into a content
-roadmap. (Demo polish and the full sales-page README arrive in M3.)
+**Your customers get instant answers from your own documents — with receipts.**
+
+## The problem
+
+Your team answers the same 20 questions every day. Customers email instead of
+reading the FAQ, then wait a day for a reply — and by then they're annoyed.
+Generic chatbots make things up, which is worse than no answer at all.
+
+## What this does
+
+A chat widget that answers strictly from *your* documents — price lists,
+policies, FAQs — and shows the source for every answer. When the documents
+don't cover a question it says so plainly and hands the visitor to a human,
+rather than inventing something.
+
+**Before:** repetitive questions land in your inbox; answers take hours.
+**After:** visitors self-serve in seconds, on your own content, with citations —
+and every question they ask is logged, so you can see exactly what your
+documents are missing.
+
+- **Grounded, not guessing** — answers come only from retrieved passages of
+  your documents; every answer names its source.
+- **Honest fallback** — no source, no answer: it says "I don't know" and
+  offers a contact, so it never misleads a customer.
+- **One-line install** — a single `<script>` tag on any page; no rebuild.
+- **A content roadmap** — the admin view logs unanswered questions, which is
+  the exact list of gaps worth filling.
+
+Running cost is roughly a penny per answered question (see [Costs](#costs)).
+
+## Packages (fixed price)
+
+- **Starter — £600:** up to ~25 documents, branded widget, citations, human
+  fallback. One week.
+- **Standard — £1,200:** + site scrape, admin view, unanswered-questions
+  report, one refresh cycle.
+- **Retainer — £150–£400/mo:** monthly re-ingest, content updates from the
+  unanswered list, tuning.
 
 ## Embed the widget
 
 One tag, anywhere before `</body>`:
 
 ```html
-<script src="https://YOUR-HOST/widget.js"
+<script src="https://your-app.up.railway.app/widget.js"
         data-name="Your Business Name"
         data-colour="#0f766e"></script>
 ```
+
+(Swap the host for your deployed URL — the widget derives its API base from
+its own script `src`, so nothing else to configure.)
 
 `/demo` serves a plain host page with the widget already embedded. Answers
 show their sources; when the documents don't cover a question the visitor
