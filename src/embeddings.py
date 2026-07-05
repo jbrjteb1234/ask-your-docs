@@ -27,6 +27,10 @@ VOYAGE_PRICES_PER_MTOK = {
 VOYAGE_URL = "https://api.voyageai.com/v1/embeddings"
 BATCH_SIZE = 128
 TIMEOUT_S = 60.0
+# Voyage's free tier allows 3 requests/min, so 429s are routine — wait and
+# retry, honouring Retry-After when sent.
+MAX_ATTEMPTS = 5
+BACKOFF_S = [4, 8, 16, 30]
 
 InputType = Literal["document", "query"]
 
@@ -48,17 +52,35 @@ class VoyageEmbedder:
 
     def _embed_batch(self, batch: list[str], input_type: InputType) -> list[list[float]]:
         started = time.monotonic()
-        response = httpx.post(
-            VOYAGE_URL,
-            headers={"Authorization": f"Bearer {self.api_key}"},
-            json={
-                "model": self.model,
-                "input": batch,
-                "input_type": input_type,
-                "output_dimension": config.embeddings_dim(),
-            },
-            timeout=TIMEOUT_S,
-        )
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            response = httpx.post(
+                VOYAGE_URL,
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json={
+                    "model": self.model,
+                    "input": batch,
+                    "input_type": input_type,
+                    "output_dimension": config.embeddings_dim(),
+                },
+                timeout=TIMEOUT_S,
+            )
+            if response.status_code != 429 and response.status_code < 500:
+                break
+            if attempt == MAX_ATTEMPTS:
+                break
+            retry_after = response.headers.get("retry-after", "")
+            wait = (
+                min(float(retry_after), 60.0)
+                if retry_after.replace(".", "", 1).isdigit()
+                else BACKOFF_S[min(attempt, len(BACKOFF_S)) - 1]
+            )
+            log.warn(
+                "embed_retry",
+                status=response.status_code,
+                attempt=attempt,
+                wait_s=wait,
+            )
+            time.sleep(wait)
         response.raise_for_status()
         body = response.json()
         total_tokens = body.get("usage", {}).get("total_tokens")
