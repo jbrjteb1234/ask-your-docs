@@ -13,19 +13,19 @@ external services reached over their APIs — nothing else to host.
 2. **Variables** tab → Raw Editor → paste (fill the three secrets from your
    local `app/.env`; do not commit them):
    ```
-   SUPABASE_URL=https://rcmsjpbktodyvbtedffx.supabase.co
-   SUPABASE_SERVICE_ROLE_KEY=<from app/.env>
-   ANTHROPIC_API_KEY=<from app/.env>
-   VOYAGE_API_KEY=<from app/.env>
-   ADMIN_KEY=<a long random string; can reuse the .env one or regenerate>
-   CONTACT_EMAIL=james@bright.me.uk
+   SUPABASE_URL=https://<your-project>.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=<your Supabase secret key>
+   ANTHROPIC_API_KEY=<your Anthropic key>
+   VOYAGE_API_KEY=<your Voyage key>
+   ADMIN_KEY=<a long random string>
+   CONTACT_EMAIL=<your support email>
    TRUST_PROXY=true
    ```
    `TRUST_PROXY=true` matters on Railway — the app sits behind Railway's proxy,
    so this makes the per-IP rate limiter read the real client IP.
 3. **Networking → Generate Domain** → note the `https://…up.railway.app` URL.
 4. In Supabase, confirm `supabase/schema.sql` has been run (chunks + questions
-   tables). The deployed app uses the same Supabase project as local.
+   tables).
 5. Ingest content (admin-only): from a machine with the keys,
    `API_BASE=https://…up.railway.app python scripts/demo.py` seeds the sample
    business, or POST your own files to `/ingest` with the `X-Admin-Key` header.

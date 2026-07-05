@@ -2,14 +2,6 @@
 
 **Your customers get instant answers from your own documents — with receipts.**
 
-## The problem
-
-Your team answers the same 20 questions every day. Customers email instead of
-reading the FAQ, then wait a day for a reply — and by then they're annoyed.
-Generic chatbots make things up, which is worse than no answer at all.
-
-## What this does
-
 A chat widget that answers strictly from *your* documents — price lists,
 policies, FAQs — and shows the source for every answer. When the documents
 don't cover a question it says so plainly and hands the visitor to a human,
@@ -22,52 +14,37 @@ documents are missing.
 
 - **Grounded, not guessing** — answers come only from retrieved passages of
   your documents; every answer names its source.
-- **Honest fallback** — no source, no answer: it says "I don't know" and
-  offers a contact, so it never misleads a customer.
+- **Honest fallback** — no source, no answer: it says "I don't know" and offers
+  a contact, so it never misleads a customer.
 - **One-line install** — a single `<script>` tag on any page; no rebuild.
 - **A content roadmap** — the admin view logs unanswered questions, which is
   the exact list of gaps worth filling.
 
-Running cost is roughly a penny per answered question (see [Costs](#costs)).
-
-## Packages (fixed price)
-
-- **Starter — £600:** up to ~25 documents, branded widget, citations, human
-  fallback. One week.
-- **Standard — £1,200:** + site scrape, admin view, unanswered-questions
-  report, one refresh cycle.
-- **Retainer — £150–£400/mo:** monthly re-ingest, content updates from the
-  unanswered list, tuning.
-
-## Embed the widget
-
-One tag, anywhere before `</body>`:
-
-```html
-<script src="https://independent-strength-production-070f.up.railway.app/widget.js"
-        data-name="Your Business Name"
-        data-colour="#0f766e"></script>
-```
-
-(The widget derives its API base from its own script `src`, so the host above
-is the only thing to change per deployment — nothing else to configure.)
-
 Live demo: https://independent-strength-production-070f.up.railway.app/demo
 
-`/demo` serves a plain host page with the widget already embedded. Answers
-show their sources; when the documents don't cover a question the visitor
-gets an honest fallback plus a `CONTACT_EMAIL` handoff link.
+## Tech stack
 
-## Admin view
+| Layer | Choice | Version |
+|-------|--------|---------|
+| Language / runtime | Python | 3.12 (Docker `python:3.12-slim`) |
+| Web framework | FastAPI | 0.139 |
+| ASGI server | Uvicorn | 0.50 |
+| Validation | Pydantic | 2.13 |
+| Answering LLM | Anthropic Claude (`claude-opus-4-8`, via `ANTHROPIC_MODEL`) | SDK 0.116 |
+| Embeddings | Voyage AI `voyage-3.5-lite` (1024-dim), REST via httpx | — |
+| Database | Supabase (hosted PostgreSQL) + `pgvector` (HNSW, cosine) | supabase-py 2.31 |
+| PDF extraction | pypdf | 6.14 |
+| HTTP client | httpx | 0.28 |
+| Config / uploads | python-dotenv 1.2, python-multipart 0.0.32 | — |
+| Frontend | Vanilla JS widget (Shadow DOM) + HTML/CSS admin — no framework | — |
+| Shared kit | `kit-logger`, `kit-claude` (vendored under `vendor/`) | — |
+| Deploy | Docker → Railway (push-to-`main` auto-deploy) | — |
 
-`/admin` (shared key — `ADMIN_KEY` in `.env`, sent as `X-Admin-Key`):
-unanswered-questions log (the content roadmap), recent questions with the
-sources used per answer, and the ingested document list. `/ingest` and
-`/documents` require the same key — only `/ask`, `/widget.js`, `/demo` and
-`/health` are public. Public `/ask` is rate-limited per IP
-(`RATE_LIMIT_PER_MIN`, default 10).
+Deliberately boring: no vector-DB service (retrieval is one Postgres
+function), no LangChain, no ORM, no frontend framework. Keeps running cost near
+zero and the whole thing debuggable.
 
-## How it works
+## Architecture
 
 ```
 upload PDF / text / markdown
@@ -82,9 +59,32 @@ Claude answers ONLY from those chunks → {answer, citations, confident}
    weak retrieval or not in the docs → {fallback message, confident: false}
 ```
 
+Code layout (`src/`):
+
+| Module | Responsibility |
+|--------|----------------|
+| `main.py` | FastAPI app: routes, CORS, admin auth, rate limit |
+| `config.py` | Env-backed config + honest missing-config reporting |
+| `extract.py` | PDF (per page) and text/markdown → text units |
+| `chunker.py` | Fixed-size + overlap chunking |
+| `embeddings.py` | Voyage embedder behind a swappable `Embedder` interface |
+| `db.py` | Supabase access: store, per-file replace/delete, vector retrieval |
+| `rag.py` | Ask pipeline: retrieve → grounded Claude answer → citations |
+
+`vendor/` holds a **copy** of the shared kit (`/kit/py` in the private
+monorepo) so the app deploys standalone — never edit `vendor/` directly; edit
+the canonical kit and re-sync (see [DEPLOY.md](DEPLOY.md)).
+
+## Prerequisites
+
+- Python 3.12+
+- Free accounts on **Supabase**, **Anthropic** (billing enabled — no free
+  tier), and **Voyage AI** (200M free embedding tokens)
+
 ## Local setup
 
-1. Python 3.11+. Create a venv and install:
+1. Create a venv and install (the shared kit is already vendored into
+   `vendor/` and installed via `requirements.txt` — nothing extra to do):
 
    ```
    cd projects/p2-docs-assistant/app
@@ -95,10 +95,12 @@ Claude answers ONLY from those chunks → {answer, citations, confident}
 
 2. Create a [Supabase](https://supabase.com) project and run
    `supabase/schema.sql` in the SQL editor (enables pgvector, creates the
-   `chunks` table + `match_chunks` function).
+   `chunks` + `questions` tables and the `match_chunks` function). The schema
+   defines the embedding size as `vector(1024)`; if you change
+   `EMBEDDINGS_MODEL` to one with a different dimension, set `EMBEDDINGS_DIM`
+   to match **and** update `vector(N)` in `schema.sql` to the same number.
 
-3. Copy `.env.example` to `.env` and fill in the keys (Supabase, Anthropic,
-   [Voyage AI](https://dash.voyageai.com) — 200M free embedding tokens).
+3. Copy `.env.example` to `.env` and fill it in (see Configuration below).
 
 4. Run the API:
 
@@ -106,12 +108,82 @@ Claude answers ONLY from those chunks → {answer, citations, confident}
    uvicorn src.main:app --reload
    ```
 
-5. Smoke test (ingests `samples/`, asks three questions — one answerable,
-   one nuanced, one unanswerable):
+   It serves on **http://127.0.0.1:8000** — open `/demo` for the widget,
+   `/admin` for the dashboard, `/health` to check config.
+
+5. Smoke test (ingests `samples/`, asks one answerable, one nuanced and one
+   unanswerable question):
 
    ```
    python scripts/demo.py
    ```
+
+   Voyage's free tier allows 3 requests/min, so the first run may pace slowly
+   (the client retries automatically) — that's expected, not an error.
+
+## Configuration (environment variables)
+
+`.env` locally; set the same values in Railway's Variables for deployment.
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `SUPABASE_URL` | yes | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | yes | Supabase secret key (server-side; bypasses RLS) |
+| `ANTHROPIC_API_KEY` | yes (ask) | Anthropic API key |
+| `VOYAGE_API_KEY` | yes | Voyage AI embeddings key |
+| `ADMIN_KEY` | yes (admin) | Shared key for `/admin`, `/ingest`, `/documents` |
+| `CONTACT_EMAIL` | recommended | Shown as the human handoff on fallbacks |
+| `ANTHROPIC_MODEL` | no | Answering model (default `claude-opus-4-8`) |
+| `EMBEDDINGS_PROVIDER` | no | Only `voyage` implemented today (see note) |
+| `EMBEDDINGS_MODEL` | no | Default `voyage-3.5-lite` |
+| `EMBEDDINGS_DIM` | no | Default `1024` — must match `vector(N)` in the schema |
+| `TOP_K` | no | Chunks retrieved per question (default 5) |
+| `MIN_SIMILARITY` | no | Below this best-match score → honest fallback (default 0.30) |
+| `RATE_LIMIT_PER_MIN` | no | Public `/ask` requests per IP per minute (default 10) |
+| `TRUST_PROXY` | prod | Set `true` **only** behind a proxy you control (e.g. Railway/nginx) so the rate limiter reads the real client IP; leaving it off on a direct-exposed host is safer, but on Railway you want it `true` |
+| `PORT` | no | Injected by the platform (Railway); defaults to 8000 locally |
+
+`EMBEDDINGS_PROVIDER` note: the code is *designed* to be provider-swappable
+(thin `Embedder` interface), but only Voyage is implemented — switching
+providers requires adding a branch in `get_embedder()`, not just changing the
+env var.
+
+## Ingesting documents
+
+There is **no upload button** in the admin UI — ingest is API-only, admin-key
+protected, and accepts `.pdf`, `.txt`, `.md` (no site scraping / DOCX yet):
+
+```
+curl -H "X-Admin-Key: $ADMIN_KEY" \
+     -F files=@pricing.md -F files=@policies.pdf \
+     https://<your-host>/ingest
+```
+
+Re-uploading a filename **replaces** that file's chunks (the refresh path).
+To load a website, save the pages to PDF/text first. Delete a file's chunks
+with `DELETE /documents/{filename}` (admin key).
+
+## Using the admin view
+
+Open `/admin`, paste your `ADMIN_KEY` into the key field (it's kept in the
+browser and sent as the `X-Admin-Key` header on subsequent requests). You get
+the unanswered-questions log (your content roadmap), recent questions with the
+sources used per answer, and the document list.
+
+## Embed the widget
+
+One tag, anywhere before `</body>`:
+
+```html
+<script src="https://independent-strength-production-070f.up.railway.app/widget.js"
+        data-name="Your Business Name"
+        data-colour="#0f766e"></script>
+```
+
+The widget derives its API base from its own script `src`, so the host above
+is the only thing to change per deployment. It renders in a Shadow DOM
+(isolated from host-page CSS) and inserts all answer text via `textContent`
+(so a document can't inject markup into the customer's page).
 
 ## Endpoints
 
@@ -127,12 +199,31 @@ Claude answers ONLY from those chunks → {answer, citations, confident}
 | GET | `/documents` | X-Admin-Key | Ingested files with chunk counts |
 | DELETE | `/documents/{filename}` | X-Admin-Key | Remove a file's chunks |
 
-Every ingest, embedding, retrieval and Claude call emits a structured JSON
-log line with timings, token counts and estimated cost.
+Every ingest, embedding, retrieval and Claude call emits a structured JSON log
+line with timings, token counts and estimated cost.
 
 ## Costs
 
-Embeddings: Voyage `voyage-3.5-lite` at $0.02 per million tokens (first 200M
-free) — swappable via `EMBEDDINGS_PROVIDER`/`EMBEDDINGS_MODEL`. Answering:
-Claude (model from `ANTHROPIC_MODEL`), token counts and USD cost logged per
-call. Supabase free tier covers the demo comfortably.
+Roughly **a penny per answered question**, almost entirely the Claude call
+(~$0.013 on `claude-opus-4-8`; set `ANTHROPIC_MODEL` to a smaller model like
+Haiku to cut this materially, with some quality tradeoff). Embeddings are
+~$0.0000003/question on Voyage `voyage-3.5-lite` ($0.02/1M tokens, first 200M
+free). Supabase's free tier covers the demo comfortably. **Anthropic is the one
+component with no free tier — a funded account is required from the first
+question.**
+
+## Security posture
+
+- **CORS is open** (`*`) so the widget can POST from any customer site, but
+  only `Content-Type` is allowed through — the admin endpoints can't be called
+  cross-origin.
+- **Admin auth is a single shared key** (`ADMIN_KEY`), constant-time compared.
+  Anyone with it can read all logged customer questions; rotate by changing
+  the env var and redeploying.
+- **The rate limit is in-memory per process** — it resets on redeploy and is
+  not shared across replicas, so keep the service at a single instance.
+
+## Deployment
+
+Deploys as a Docker container on Railway with push-to-`main` auto-deploy — see
+[DEPLOY.md](DEPLOY.md) for the full runbook and the known limitations.
