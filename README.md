@@ -44,13 +44,15 @@ Running cost is roughly a penny per answered question (see [Costs](#costs)).
 One tag, anywhere before `</body>`:
 
 ```html
-<script src="https://your-app.up.railway.app/widget.js"
+<script src="https://independent-strength-production-070f.up.railway.app/widget.js"
         data-name="Your Business Name"
         data-colour="#0f766e"></script>
 ```
 
-(Swap the host for your deployed URL — the widget derives its API base from
-its own script `src`, so nothing else to configure.)
+(The widget derives its API base from its own script `src`, so the host above
+is the only thing to change per deployment — nothing else to configure.)
+
+Live demo: https://independent-strength-production-070f.up.railway.app/demo
 
 `/demo` serves a plain host page with the widget already embedded. Answers
 show their sources; when the documents don't cover a question the visitor
