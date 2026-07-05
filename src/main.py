@@ -27,7 +27,7 @@ def _require(required: list[str]) -> None:
     if missing:
         raise HTTPException(
             status_code=503,
-            detail=f"not configured — set in .env: {', '.join(missing)}",
+            detail=f"not configured - set in .env: {', '.join(missing)}",
         )
 
 
