@@ -39,3 +39,15 @@ def top_k() -> int:
 
 def min_similarity() -> float:
     return float(os.environ.get("MIN_SIMILARITY", "0.30"))
+
+
+def admin_key() -> str:
+    return os.environ.get("ADMIN_KEY", "")
+
+
+def contact_email() -> str:
+    return os.environ.get("CONTACT_EMAIL", "")
+
+
+def rate_limit_per_min() -> int:
+    return int(os.environ.get("RATE_LIMIT_PER_MIN", "10"))

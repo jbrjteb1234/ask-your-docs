@@ -13,9 +13,14 @@ import sys
 from pathlib import Path
 
 import httpx
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 BASE = os.environ.get("API_BASE", "http://127.0.0.1:8000")
 SAMPLES = Path(__file__).resolve().parents[1] / "samples"
+# /ingest and /documents are admin-protected from M2 on.
+ADMIN_HEADERS = {"X-Admin-Key": os.environ.get("ADMIN_KEY", "")}
 
 QUESTIONS = [
     ("answerable", "How much does it cost to hire an e-mountain bike for a full day?"),
@@ -43,6 +48,7 @@ def main() -> int:
     response = client.post(
         "/ingest",
         files=[("files", (p.name, p.read_bytes())) for p in files],
+        headers=ADMIN_HEADERS,
     )
     if response.status_code != 200:
         print(f"INGEST FAILED ({response.status_code}): {response.text}")
@@ -50,7 +56,7 @@ def main() -> int:
     print(json.dumps(response.json(), indent=2))
 
     print("\nStored documents:")
-    print(json.dumps(client.get("/documents").json(), indent=2))
+    print(json.dumps(client.get("/documents", headers=ADMIN_HEADERS).json(), indent=2))
 
     failures = 0
     for label, question in QUESTIONS:

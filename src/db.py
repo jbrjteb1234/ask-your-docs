@@ -51,3 +51,29 @@ def match_chunks(query_embedding: list[float], match_count: int) -> list[dict[st
         {"query_embedding": query_embedding, "match_count": match_count},
     ).execute()
     return result.data or []
+
+
+def insert_question(
+    question: str, answer: str, confident: bool, citations: list[dict[str, Any]]
+) -> None:
+    get_db().table("questions").insert(
+        {
+            "question": question,
+            "answer": answer,
+            "confident": confident,
+            "citations": citations,
+        }
+    ).execute()
+
+
+def list_questions(unanswered_only: bool, limit: int) -> list[dict[str, Any]]:
+    query = (
+        get_db()
+        .table("questions")
+        .select("id, question, answer, confident, citations, created_at")
+        .order("created_at", desc=True)
+        .limit(limit)
+    )
+    if unanswered_only:
+        query = query.eq("confident", False)
+    return query.execute().data or []

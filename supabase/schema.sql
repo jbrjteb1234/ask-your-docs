@@ -44,3 +44,18 @@ $$;
 -- No policies on purpose: only the service-role key (used by the API) can
 -- read or write; anon/authenticated clients get nothing.
 alter table chunks enable row level security;
+
+-- M2: every /ask is recorded; confident=false rows are the
+-- unanswered-questions log shown in the admin view.
+create table if not exists questions (
+  id bigint generated always as identity primary key,
+  question text not null,
+  answer text not null,
+  confident boolean not null,
+  citations jsonb not null default '[]',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists questions_created_idx on questions (created_at desc);
+
+alter table questions enable row level security;

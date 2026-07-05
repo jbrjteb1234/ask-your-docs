@@ -46,7 +46,16 @@ ANSWER_SCHEMA = {
 
 def _fallback(reason: str) -> dict[str, Any]:
     log.info("ask_fallback", reason=reason)
-    return {"answer": FALLBACK_MESSAGE, "citations": [], "confident": False}
+    response: dict[str, Any] = {
+        "answer": FALLBACK_MESSAGE,
+        "citations": [],
+        "confident": False,
+    }
+    # SPEC: "I don't know — here's how to reach a human." Only fallbacks
+    # carry the contact so the widget knows when to offer the handoff.
+    if config.contact_email():
+        response["contact"] = config.contact_email()
+    return response
 
 
 def _citation(match: dict[str, Any]) -> dict[str, Any]:

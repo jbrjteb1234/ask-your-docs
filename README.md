@@ -1,9 +1,33 @@
-# Ask Your Documents — support assistant (M1)
+# Ask Your Documents — support assistant (M2)
 
 Answers questions strictly from YOUR business documents, with citations —
-or an honest "I don't know" instead of a made-up answer. M1 is the bare API
-proving the spine: ingest → retrieve → cited answer. (Widget, admin view and
-the full sales-page README arrive in M2/M3.)
+or an honest "I don't know" plus a route to a human instead of a made-up
+answer. Ships as a chat widget any website can embed with one script tag,
+backed by an admin view that turns unanswered questions into a content
+roadmap. (Demo polish and the full sales-page README arrive in M3.)
+
+## Embed the widget
+
+One tag, anywhere before `</body>`:
+
+```html
+<script src="https://YOUR-HOST/widget.js"
+        data-name="Your Business Name"
+        data-colour="#0f766e"></script>
+```
+
+`/demo` serves a plain host page with the widget already embedded. Answers
+show their sources; when the documents don't cover a question the visitor
+gets an honest fallback plus a `CONTACT_EMAIL` handoff link.
+
+## Admin view
+
+`/admin` (shared key — `ADMIN_KEY` in `.env`, sent as `X-Admin-Key`):
+unanswered-questions log (the content roadmap), recent questions with the
+sources used per answer, and the ingested document list. `/ingest` and
+`/documents` require the same key — only `/ask`, `/widget.js`, `/demo` and
+`/health` are public. Public `/ask` is rate-limited per IP
+(`RATE_LIMIT_PER_MIN`, default 10).
 
 ## How it works
 
@@ -53,13 +77,17 @@ Claude answers ONLY from those chunks → {answer, citations, confident}
 
 ## Endpoints
 
-| Method | Path | What it does |
-|--------|------|--------------|
-| GET | `/health` | Status + any missing env config |
-| POST | `/ingest` | Multipart upload of `.pdf` / `.txt` / `.md`; re-uploading a filename replaces its chunks |
-| POST | `/ask` | `{"question": "..."}` → `{answer, citations, confident}` |
-| GET | `/documents` | Ingested files with chunk counts |
-| DELETE | `/documents/{filename}` | Remove a file's chunks |
+| Method | Path | Auth | What it does |
+|--------|------|------|--------------|
+| GET | `/health` | public | Status + any missing env config |
+| POST | `/ask` | public, rate-limited | `{"question": "..."}` → `{answer, citations, confident}` (+ `contact` on fallbacks) |
+| GET | `/widget.js` | public | The embeddable widget |
+| GET | `/demo` | public | Plain host page with the widget embedded |
+| GET | `/admin` | key via page | Admin view |
+| GET | `/admin/questions` | X-Admin-Key | Question log; `?unanswered=true` for the roadmap list |
+| POST | `/ingest` | X-Admin-Key | Multipart upload of `.pdf` / `.txt` / `.md`; re-uploading a filename replaces its chunks |
+| GET | `/documents` | X-Admin-Key | Ingested files with chunk counts |
+| DELETE | `/documents/{filename}` | X-Admin-Key | Remove a file's chunks |
 
 Every ingest, embedding, retrieval and Claude call emits a structured JSON
 log line with timings, token counts and estimated cost.

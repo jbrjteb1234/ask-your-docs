@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Docs Assistant — Admin</title>
+  <style>
+    body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; max-width: 860px;
+           margin: 30px auto; padding: 0 20px; color: #1a1a1a; background: #fafafa; }
+    h1 { font-size: 22px; }
+    h2 { font-size: 16px; margin-top: 32px; border-bottom: 2px solid #e3e5e8; padding-bottom: 6px; }
+    .hint { color: #667085; font-size: 13px; }
+    #login input { padding: 8px 10px; font-size: 14px; width: 280px; }
+    #login button, .refresh { padding: 8px 14px; font-size: 14px; cursor: pointer;
+           background: #1f6feb; border: none; color: #fff; border-radius: 6px; }
+    .card { background: #fff; border: 1px solid #e3e5e8; border-radius: 8px;
+            padding: 12px 14px; margin-bottom: 10px; }
+    .q { font-weight: 600; margin-bottom: 6px; }
+    .a { font-size: 14px; color: #333; white-space: pre-wrap; }
+    .meta { font-size: 12px; color: #667085; margin-top: 8px; }
+    .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+    .badge.answered { background: #e6f4ea; color: #137333; }
+    .badge.unanswered { background: #fce8e6; color: #c5221f; }
+    .error { color: #c5221f; }
+    .empty { color: #667085; font-style: italic; }
+    table { width: 100%; border-collapse: collapse; background: #fff; font-size: 14px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e3e5e8; }
+  </style>
+</head>
+<body>
+  <h1>Docs Assistant — Admin</h1>
+
+  <div id="login">
+    <p class="hint">Enter the shared admin key (ADMIN_KEY in the server's .env).</p>
+    <input type="password" id="key" placeholder="admin key" autocomplete="off">
+    <button id="enter">View</button>
+    <p id="loginError" class="error" hidden>That key was not accepted.</p>
+  </div>
+
+  <div id="content" hidden>
+    <button class="refresh" id="refresh">Refresh</button>
+    <p id="loadError" class="error" hidden></p>
+
+    <h2>Unanswered questions — your content roadmap</h2>
+    <p class="hint">Customers asked these and the documents had no answer.
+    Each one is a gap worth filling.</p>
+    <div id="unanswered"></div>
+
+    <h2>Recent questions</h2>
+    <div id="recent"></div>
+
+    <h2>Documents</h2>
+    <div id="documents"></div>
+  </div>
+
+  <script>
+    "use strict";
+    var keyInput = document.getElementById("key");
+    var loginBox = document.getElementById("login");
+    var contentBox = document.getElementById("content");
+    var loginError = document.getElementById("loginError");
+
+    function adminKey() { return sessionStorage.getItem("p2_admin_key") || ""; }
+
+    function el(tag, className, text) {
+      var node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    function fetchAdmin(path) {
+      return fetch(path, { headers: { "X-Admin-Key": adminKey() } }).then(function (r) {
+        if (r.status === 401) throw new Error("auth");
+        if (!r.ok) throw new Error("http " + r.status);
+        return r.json();
+      });
+    }
+
+    function citationText(citations) {
+      var labels = [];
+      (citations || []).forEach(function (c) {
+        var label = c.filename + (c.page !== null && c.page !== undefined ? " (p." + c.page + ")" : "");
+        if (labels.indexOf(label) === -1) labels.push(label);
+      });
+      return labels.length ? "Sources: " + labels.join(" · ") : "No sources";
+    }
+
+    function questionCard(row) {
+      var card = el("div", "card");
+      card.appendChild(el("div", "q", row.question));
+      card.appendChild(el("div", "a", row.answer));
+      var meta = el("div", "meta");
+      var badge = el("span", "badge " + (row.confident ? "answered" : "unanswered"),
+                     row.confident ? "answered" : "unanswered");
+      meta.appendChild(badge);
+      meta.appendChild(document.createTextNode(
+        "  ·  " + citationText(row.citations) + "  ·  " + new Date(row.created_at).toLocaleString()));
+      card.appendChild(meta);
+      return card;
+    }
+
+    function render(listNode, rows, emptyText) {
+      listNode.replaceChildren();
+      if (!rows.length) { listNode.appendChild(el("p", "empty", emptyText)); return; }
+      rows.forEach(function (row) { listNode.appendChild(questionCard(row)); });
+    }
+
+    function load() {
+      Promise.all([
+        fetchAdmin("/admin/questions?unanswered=true&limit=100"),
+        fetchAdmin("/admin/questions?limit=50"),
+        fetchAdmin("/documents")
+      ]).then(function (results) {
+        loginBox.hidden = true;
+        contentBox.hidden = false;
+        render(document.getElementById("unanswered"), results[0].questions,
+               "Nothing unanswered — the documents are covering everything asked so far.");
+        render(document.getElementById("recent"), results[1].questions,
+               "No questions asked yet.");
+        var docsNode = document.getElementById("documents");
+        docsNode.replaceChildren();
+        var docs = results[2].documents;
+        if (!docs.length) { docsNode.appendChild(el("p", "empty", "No documents ingested yet.")); return; }
+        var table = el("table");
+        var head = el("tr");
+        ["File", "Chunks", "Pages"].forEach(function (h) { head.appendChild(el("th", null, h)); });
+        table.appendChild(head);
+        docs.forEach(function (d) {
+          var tr = el("tr");
+          tr.appendChild(el("td", null, d.filename));
+          tr.appendChild(el("td", null, String(d.chunks)));
+          tr.appendChild(el("td", null, d.pages === null ? "—" : String(d.pages)));
+          table.appendChild(tr);
+        });
+        docsNode.appendChild(table);
+      }).catch(function (err) {
+        if (err.message === "auth") {
+          sessionStorage.removeItem("p2_admin_key");
+          loginBox.hidden = false;
+          contentBox.hidden = true;
+          loginError.hidden = false;
+        } else {
+          loginBox.hidden = true;
+          contentBox.hidden = false;
+          var loadError = document.getElementById("loadError");
+          loadError.textContent = "Could not load admin data (" + err.message +
+            "). If the questions table is new, re-run supabase/schema.sql and refresh.";
+          loadError.hidden = false;
+        }
+      });
+    }
+
+    document.getElementById("enter").addEventListener("click", function () {
+      sessionStorage.setItem("p2_admin_key", keyInput.value.trim());
+      keyInput.value = "";
+      loginError.hidden = true;
+      load();
+    });
+    keyInput.addEventListener("keydown", function (e) { if (e.key === "Enter") document.getElementById("enter").click(); });
+    document.getElementById("refresh").addEventListener("click", load);
+
+    if (adminKey()) load();
+  </script>
+</body>
+</html>
