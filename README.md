@@ -30,7 +30,7 @@ Live demo: https://independent-strength-production-070f.up.railway.app/demo
 | Web framework | FastAPI | 0.139 |
 | ASGI server | Uvicorn | 0.50 |
 | Validation | Pydantic | 2.13 |
-| Answering LLM | Anthropic Claude (`claude-opus-4-8`, via `ANTHROPIC_MODEL`) | SDK 0.116 |
+| Answering LLM | Anthropic Claude (`claude-sonnet-5` default, via `ANTHROPIC_MODEL`) | SDK 0.116 |
 | Embeddings | Voyage AI `voyage-3.5-lite` (1024-dim), REST via httpx | — |
 | Database | Supabase (hosted PostgreSQL) + `pgvector` (HNSW, cosine) | supabase-py 2.31 |
 | PDF extraction | pypdf | 6.14 |
@@ -133,7 +133,7 @@ the canonical kit and re-sync (see [DEPLOY.md](DEPLOY.md)).
 | `VOYAGE_API_KEY` | yes | Voyage AI embeddings key |
 | `ADMIN_KEY` | yes (admin) | Shared key for `/admin`, `/ingest`, `/documents` |
 | `CONTACT_EMAIL` | recommended | Shown as the human handoff on fallbacks |
-| `ANTHROPIC_MODEL` | no | Answering model (default `claude-opus-4-8`) |
+| `ANTHROPIC_MODEL` | no | Answering model (default `claude-sonnet-5`; `claude-opus-4-8` for max quality, `claude-haiku-4-5` for min cost) |
 | `EMBEDDINGS_PROVIDER` | no | Only `voyage` implemented today (see note) |
 | `EMBEDDINGS_MODEL` | no | Default `voyage-3.5-lite` |
 | `EMBEDDINGS_DIM` | no | Default `1024` — must match `vector(N)` in the schema |
@@ -204,9 +204,10 @@ line with timings, token counts and estimated cost.
 
 ## Costs
 
-Roughly **a penny per answered question**, almost entirely the Claude call
-(~$0.013 on `claude-opus-4-8`; set `ANTHROPIC_MODEL` to a smaller model like
-Haiku to cut this materially, with some quality tradeoff). Embeddings are
+Well under a penny per answered question, almost entirely the Claude call. The
+default `claude-sonnet-5` ($3/$15 per Mtok) runs roughly **$0.008/question**;
+`claude-opus-4-8` ($5/$25) is ~$0.013 for higher quality, `claude-haiku-4-5`
+($1/$5) is cheaper still — switch via `ANTHROPIC_MODEL`. Embeddings are
 ~$0.0000003/question on Voyage `voyage-3.5-lite` ($0.02/1M tokens, first 200M
 free). Supabase's free tier covers the demo comfortably. **Anthropic is the one
 component with no free tier — a funded account is required from the first
