@@ -114,6 +114,7 @@
       ]).then(function (results) {
         loginBox.hidden = true;
         contentBox.hidden = false;
+        document.getElementById("loadError").hidden = true;
         render(document.getElementById("unanswered"), results[0].questions,
                "Nothing unanswered — the documents are covering everything asked so far.");
         render(document.getElementById("recent"), results[1].questions,

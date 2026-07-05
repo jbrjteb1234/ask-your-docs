@@ -7,6 +7,7 @@ services answer 503 naming exactly what is missing (see src/config.py).
 """
 
 import hmac
+import threading
 import time
 from collections import defaultdict, deque
 from pathlib import Path
@@ -62,24 +63,40 @@ def _require_admin(request: Request) -> None:
 # --- public rate limit on /ask (per IP, sliding minute) ---------------------
 
 _ask_windows: dict[str, deque] = defaultdict(deque)
+_ask_windows_lock = threading.Lock()
+# Backstop against the tracked-IP dict growing unbounded over process life.
+_MAX_TRACKED_IPS = 10_000
 
 
 def _client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    # X-Forwarded-For is only trustworthy behind a proxy we control; a direct
+    # client sets it themselves, so honouring it would let anyone forge a fresh
+    # rate-limit identity per request. Default off -> use the real socket peer.
+    if config.trust_proxy():
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            # The last hop is the one our own proxy appended.
+            return forwarded.split(",")[-1].strip()[:64]
     return request.client.host if request.client else "unknown"
 
 
 def _rate_limited(ip: str) -> bool:
     now = time.monotonic()
-    window = _ask_windows[ip]
-    while window and now - window[0] > 60:
-        window.popleft()
-    if len(window) >= config.rate_limit_per_min():
-        return True
-    window.append(now)
-    return False
+    limit = config.rate_limit_per_min()
+    # Sync def endpoint -> FastAPI runs it on a threadpool, so the shared dict
+    # and deques need a lock to make check-and-append atomic.
+    with _ask_windows_lock:
+        if len(_ask_windows) > _MAX_TRACKED_IPS:
+            stale = [k for k, w in _ask_windows.items() if not w or now - w[-1] > 60]
+            for k in stale:
+                del _ask_windows[k]
+        window = _ask_windows[ip]
+        while window and now - window[0] > 60:
+            window.popleft()
+        if len(window) >= limit:
+            return True
+        window.append(now)
+        return False
 
 
 # --- public endpoints --------------------------------------------------------
@@ -107,6 +124,11 @@ def ask(request: AskRequest, http_request: Request) -> dict:
     except httpx.HTTPError as err:
         log.error("ask_embed_failed", error=str(err))
         raise HTTPException(status_code=502, detail="embeddings call failed")
+    except Exception as err:
+        # Supabase/Claude/JSON-parse failures must surface as an honest 502,
+        # not leak a raw 500 traceback to a public caller.
+        log.error("ask_failed", error=str(err))
+        raise HTTPException(status_code=502, detail="could not answer right now - please try again")
     # Record for the admin view; a logging failure must never break the answer.
     try:
         db.insert_question(
@@ -124,7 +146,9 @@ def ask(request: AskRequest, http_request: Request) -> dict:
 
 @app.get("/widget.js")
 def widget_js() -> FileResponse:
-    return FileResponse(STATIC_DIR / "widget.js", media_type="application/javascript")
+    # Explicit charset so the widget's non-ASCII UI text renders correctly even
+    # when embedded on a legacy-encoded (e.g. windows-1252) host page.
+    return FileResponse(STATIC_DIR / "widget.js", media_type="text/javascript; charset=utf-8")
 
 
 @app.get("/demo")
@@ -178,7 +202,15 @@ async def ingest(request: Request, files: list[UploadFile]) -> dict:
         data = await upload.read()
         log.info("ingest_received", filename=name, bytes=len(data))
 
-        units = extract_units(name, data)
+        try:
+            units = extract_units(name, data)
+        except Exception as err:
+            log.warn("ingest_extract_failed", filename=name, error=str(err))
+            ext = name.rsplit(".", 1)[-1]
+            raise HTTPException(
+                status_code=400,
+                detail=f"could not read {name} - is it a valid, unencrypted {ext} file?",
+            )
         rows = []
         for page, text in units:
             for piece in chunk_text(text):
@@ -226,7 +258,12 @@ async def ingest(request: Request, files: list[UploadFile]) -> dict:
 def documents(request: Request) -> dict:
     _require_admin(request)
     _require(config.INGEST_REQUIRES[:2])  # Supabase only
-    return {"documents": db.list_documents()}
+    try:
+        docs = db.list_documents()
+    except Exception as err:
+        log.error("documents_read_failed", error=str(err))
+        raise HTTPException(status_code=502, detail="database read failed")
+    return {"documents": docs}
 
 
 @app.delete("/documents/{filename}")
@@ -234,7 +271,11 @@ def delete_document(request: Request, filename: str) -> dict:
     _require_admin(request)
     _require(config.INGEST_REQUIRES[:2])  # Supabase only
     name = safe_filename(filename)
-    deleted = db.delete_chunks(name)
+    try:
+        deleted = db.delete_chunks(name)
+    except Exception as err:
+        log.error("document_delete_failed", filename=name, error=str(err))
+        raise HTTPException(status_code=502, detail="database write failed")
     if deleted == 0:
         raise HTTPException(status_code=404, detail=f"no chunks stored for {name}")
     log.info("document_deleted", filename=name, chunks=deleted)

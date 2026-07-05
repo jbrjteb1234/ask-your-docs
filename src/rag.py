@@ -55,6 +55,8 @@ def _fallback(reason: str) -> dict[str, Any]:
     # carry the contact so the widget knows when to offer the handoff.
     if config.contact_email():
         response["contact"] = config.contact_email()
+    else:
+        log.warn("fallback_without_contact", note="set CONTACT_EMAIL to offer a human handoff")
     return response
 
 

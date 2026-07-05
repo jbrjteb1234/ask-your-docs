@@ -51,3 +51,10 @@ def contact_email() -> str:
 
 def rate_limit_per_min() -> int:
     return int(os.environ.get("RATE_LIMIT_PER_MIN", "10"))
+
+
+def trust_proxy() -> bool:
+    # Only when the app runs behind a proxy we control (Railway, nginx) is
+    # X-Forwarded-For trustworthy. Off by default: a direct client must not be
+    # able to forge its own rate-limit identity.
+    return os.environ.get("TRUST_PROXY", "").lower() in ("1", "true", "yes")

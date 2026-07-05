@@ -28,7 +28,17 @@
   var host = document.createElement("div");
   host.id = "ask-your-docs-widget";
   var root = host.attachShadow({ mode: "open" });
-  document.body.appendChild(host);
+  // The whole widget is built against the shadow root, so it works while the
+  // host node is still detached. Only attaching to the page needs <body> —
+  // defer that if the script runs from <head> before the body exists.
+  function mount() {
+    document.body.appendChild(host);
+  }
+  if (document.body) {
+    mount();
+  } else {
+    document.addEventListener("DOMContentLoaded", mount);
+  }
 
   var style = document.createElement("style");
   style.textContent = [
@@ -57,7 +67,8 @@
     ".contact a { color: var(--accent); }",
     ".typing { color: #98a2b3; font-style: italic; }",
     ".inputrow { display: flex; border-top: 1px solid #e3e5e8; background: #fff; }",
-    ".inputrow input { flex: 1; border: none; padding: 12px 14px; font-size: 14px; outline: none; }",
+    // 16px keeps iOS Safari from auto-zooming the page when the field focuses.
+    ".inputrow input { flex: 1; border: none; padding: 12px 14px; font-size: 16px; outline: none; }",
     ".inputrow button { border: none; background: var(--accent); color: #fff; padding: 0 18px;",
     "  font-size: 14px; cursor: pointer; }",
     ".inputrow button:disabled { opacity: .5; cursor: default; }",
@@ -112,6 +123,9 @@
   });
   sendBtn.addEventListener("click", send);
   input.addEventListener("keydown", function (event) {
+    // isComposing / keyCode 229: the Enter is confirming an IME candidate
+    // (Japanese/Chinese/Korean), not submitting — don't send a partial.
+    if (event.isComposing || event.keyCode === 229) return;
     if (event.key === "Enter") send();
   });
 
