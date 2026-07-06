@@ -22,6 +22,15 @@ documents are missing.
 
 Live demo: https://independent-strength-production-070f.up.railway.app/demo
 
+## Fixed prices
+
+- **Starter — £600:** up to ~25 documents, branded widget, citations, human
+  fallback, delivered in a week.
+- **Standard — £1,200:** + ingest of your existing site pages, the admin
+  view, an unanswered-questions report, one content refresh cycle.
+- **Retainer — £150–£400/mo:** monthly re-ingest, content updates driven by
+  the unanswered-questions log, tuning.
+
 ## Tech stack
 
 | Layer | Choice | Version |
