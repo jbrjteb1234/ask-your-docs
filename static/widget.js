@@ -145,8 +145,16 @@
   }
 
   function send() {
+    if (sendBtn.disabled) return;
     var question = input.value.trim();
-    if (question.length < 3 || sendBtn.disabled) return;
+    if (question.length < 3) {
+      // never swallow input silently — say why nothing was sent
+      var last = messages.lastChild;
+      if (!last || last.textContent.indexOf("few more words") === -1) {
+        addBot("Could you give me a few more words? I need a fuller question to search the documents.", "fallback");
+      }
+      return;
+    }
     input.value = "";
     var userMsg = el("div", "msg user", question);
     messages.appendChild(userMsg);
