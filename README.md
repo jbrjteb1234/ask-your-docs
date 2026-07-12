@@ -22,7 +22,8 @@ documents are missing.
 - **A content roadmap** — the admin view logs unanswered questions, which is
   the exact list of gaps worth filling.
 
-Live demo: https://independent-strength-production-070f.up.railway.app/demo
+Live demo: https://independent-strength-production-070f.up.railway.app/demo —
+or watch the [3-minute Loom walkthrough](https://www.loom.com/share/aae3b8fce505454182f2319cc2bee1f9).
 
 ## Fixed prices
 
