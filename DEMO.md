@@ -1,5 +1,7 @@
 # DEMO.md — Loom script (2–3 minutes)
 
+**Recorded 2026-07-12:** https://www.loom.com/share/aae3b8fce505454182f2319cc2bee1f9
+
 Goal: show a prospect that the assistant answers from *their* content, cites
 sources, and refuses to guess — then reveal the unanswered-questions log as
 their content roadmap. Record at 1280×720. Have the deployed URL open on the
@@ -55,5 +57,4 @@ and demo on their own content — that is the whole sales weapon.
 - [ ] Deployed URL live; `/demo` and `/admin` both loaded.
 - [ ] Admin already unlocked (don't type the key on camera).
 - [ ] Samples ingested so answers are ready.
-- [ ] Do a dry run once — Voyage free tier is 3 req/min, so on the free tier
-      answers can lag; add a payment method (cost stays ~nil) for snappy demos.
+- [ ] Do a dry run once — Voyage free tier is 3 req/min, so on the free

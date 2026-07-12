@@ -2,6 +2,8 @@
 
 **Your customers get instant answers from your own documents — with receipts.**
 
+**Watch it work (3 minutes):** [Loom demo](https://www.loom.com/share/aae3b8fce505454182f2319cc2bee1f9)
+
 A chat widget that answers strictly from *your* documents — price lists,
 policies, FAQs — and shows the source for every answer. When the documents
 don't cover a question it says so plainly and hands the visitor to a human,
@@ -235,5 +237,4 @@ question.**
 
 ## Deployment
 
-Deploys as a Docker container on Railway with push-to-`main` auto-deploy — see
-[DEPLOY.md](DEPLOY.md) for the full runbook and the known limitations.
+Deploys as a Docker container on Railway with p
