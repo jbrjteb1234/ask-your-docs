@@ -57,4 +57,5 @@ and demo on their own content — that is the whole sales weapon.
 - [ ] Deployed URL live; `/demo` and `/admin` both loaded.
 - [ ] Admin already unlocked (don't type the key on camera).
 - [ ] Samples ingested so answers are ready.
-- [ ] Do a dry run once — Voyage free tier is 3 req/min, so on the free
+- [ ] Do a dry run once — Voyage free tier is 3 req/min, so on the free tier
+      answers can lag; add a payment method (cost stays ~nil) for snappy demos.

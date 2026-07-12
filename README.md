@@ -237,4 +237,5 @@ question.**
 
 ## Deployment
 
-Deploys as a Docker container on Railway with p
+Deploys as a Docker container on Railway with push-to-`main` auto-deploy — see
+[DEPLOY.md](DEPLOY.md) for the full runbook and the known limitations.
